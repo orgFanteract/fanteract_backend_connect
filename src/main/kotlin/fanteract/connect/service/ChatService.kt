@@ -16,6 +16,8 @@ import fanteract.connect.enumerate.ActivePoint
 import fanteract.connect.enumerate.Balance
 import fanteract.connect.enumerate.ChatroomJoinStatus
 import fanteract.connect.enumerate.RiskLevel
+import fanteract.connect.exception.ExceptionType
+import fanteract.connect.exception.MessageType
 import fanteract.connect.filter.ProfanityFilterService
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -101,7 +103,7 @@ class ChatService(
 
         // 접속 기록이 존재하는지 확인
         if (preUserChatroom != null && preUserChatroom.chatroomJoinStatus == ChatroomJoinStatus.JOIN){
-            throw kotlin.NoSuchElementException("이미 참여중인 채팅방입니다")
+            throw ExceptionType.withType(MessageType.ALREADY_JOINED)
         }
 
         // 채팅방 입장 기록 생성
@@ -129,7 +131,7 @@ class ChatService(
 
         // 접속 기록이 존재하는지 확인
         if (preUserChatroom == null || preUserChatroom.chatroomJoinStatus == ChatroomJoinStatus.LEAVE){
-            throw kotlin.NoSuchElementException("이미 탈퇴했거나 입장하지 않은 채팅방입니다")
+            throw ExceptionType.withType(MessageType.ALREADY_LEFT)
         }
 
         // 채팅방 입장 기록 변경
@@ -151,7 +153,7 @@ class ChatService(
         val user = userClient.findById(userId)
         
         if (user.balance < Balance.CHAT.cost){
-            throw kotlin.IllegalArgumentException("비용이 부족합니다")
+            throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
         }
 
         userClient.updateBalance(userId, -Balance.CHAT.cost)

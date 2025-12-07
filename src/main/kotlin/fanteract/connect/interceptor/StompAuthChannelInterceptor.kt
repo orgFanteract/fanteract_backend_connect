@@ -1,5 +1,7 @@
 package fanteract.connect.interceptor
 
+import fanteract.connect.exception.ExceptionType
+import fanteract.connect.exception.MessageType
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
@@ -34,10 +36,10 @@ class StompAuthChannelInterceptor(
         when (command) {
             StompCommand.CONNECT -> {
                 val authHeader = accessor.getFirstNativeHeader("Authorization")
-                    ?: throw kotlin.IllegalArgumentException("잘못된 토큰입니다.")
+                    ?: throw ExceptionType.withType(MessageType.INVALID_TOKEN)
 
                 if (!authHeader.startsWith("Bearer ")) {
-                    throw kotlin.IllegalArgumentException("잘못된 토큰입니다.")
+                    throw ExceptionType.withType(MessageType.INVALID_TOKEN)
                 }
 
                 val token = authHeader.removePrefix("Bearer ").trim()
