@@ -2,6 +2,8 @@ package fanteract.connect.domain
 
 import fanteract.connect.entity.UserChatroom
 import fanteract.connect.enumerate.ChatroomJoinStatus
+import fanteract.connect.exception.ExceptionType
+import fanteract.connect.exception.MessageType
 import fanteract.connect.repo.UserChatroomRepo
 import fanteract.connect.repo.UserChatroomHistoryRepo
 import org.springframework.stereotype.Component
@@ -36,7 +38,7 @@ class UserChatroomWriter(
         chatroomJoinStatus: ChatroomJoinStatus
     ): UserChatroom {
         val userChatroom = userChatroomRepo.findById(userChatroomId)
-            .orElseThrow{NoSuchElementException("조건에 맞는 채팅 기록이 존재하지 않습니다")}
+            .orElseThrow{ExceptionType.withType(MessageType.NOT_EXIST)}
 
         userChatroom.userId = userId
         userChatroom.chatroomId = chatroomId

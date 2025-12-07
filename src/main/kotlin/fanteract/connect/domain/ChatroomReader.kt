@@ -2,6 +2,8 @@ package fanteract.connect.domain
 
 import fanteract.connect.entity.Chatroom
 import fanteract.connect.enumerate.Status
+import fanteract.connect.exception.ExceptionType
+import fanteract.connect.exception.MessageType
 import fanteract.connect.repo.ChatroomRepo
 import org.springframework.stereotype.Component
 
@@ -18,10 +20,10 @@ class ChatroomReader(
     ): Chatroom {
         val chatroom =
             chatroomRepo.findById(chatroomId)
-                .orElseThrow{NoSuchElementException("조건에 맞는 채팅방이 존재하지 않습니다")}
+                .orElseThrow{ExceptionType.withType(MessageType.NOT_EXIST)}
 
         if (chatroom.userId != userId){
-            throw NoSuchElementException("조건에 맞는 채팅방이 존재하지 않습니다")
+            throw ExceptionType.withType(MessageType.NOT_EXIST)
         }
 
         return chatroom
@@ -29,10 +31,10 @@ class ChatroomReader(
 
     fun existsById(chatroomId: Long){
         val chatroom = chatroomRepo.findById(chatroomId).
-            orElseThrow { NoSuchElementException("조건에 맞는 채팅방이 존재하지 않습니다") }
+            orElseThrow { ExceptionType.withType(MessageType.NOT_EXIST) }
 
         if (chatroom.status == Status.DELETED){
-            throw NoSuchElementException("조건에 맞는 채팅방이 존재하지 않습니다")
+            throw ExceptionType.withType(MessageType.NOT_EXIST)
         }
     }
 
