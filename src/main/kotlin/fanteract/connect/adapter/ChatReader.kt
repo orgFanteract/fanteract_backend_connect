@@ -1,4 +1,4 @@
-package fanteract.connect.domain
+package fanteract.connect.adapter
 
 import fanteract.connect.entity.Chat
 import fanteract.connect.enumerate.RiskLevel

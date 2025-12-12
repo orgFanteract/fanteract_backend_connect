@@ -10,8 +10,6 @@ import fanteract.connect.exception.ExceptionType
 import fanteract.connect.exception.MessageType
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
-import io.github.resilience4j.retry.annotation.Retry
-import io.github.resilience4j.timelimiter.annotation.TimeLimiter
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -19,15 +17,14 @@ import kotlin.collections.toTypedArray
 import kotlin.jvm.java
 
 @Component
-class UserClient(
+class AccountClient(
     @Value($$"${client.account-service.url}") userServiceUrl: String,
     private val restClient: RestClient = RestClient.builder()
         .baseUrl(userServiceUrl)
         .build(),
     private val circuitBreakerRegistry: CircuitBreakerRegistry
 ) {
-    @CircuitBreaker(name = "user-service", fallbackMethod = "getExistsByIdFallback")
-    @Retry(name = "user-service")
+    @CircuitBreaker(name = "accountClient", fallbackMethod = "existsByIdFallback")
     fun existsById(userId: Long): Boolean {
         val response = restClient.get()
             .uri("/internal/users/{userId}/exists", userId)
@@ -37,15 +34,7 @@ class UserClient(
         return response?.exists ?: false
     }
 
-    fun getExistsByIdFallback(userId: Long, ex: Throwable): Boolean {
-        val cb = circuitBreakerRegistry.circuitBreaker("user-service")
-        val state = cb.state
-
-        println("existsByIdFallback userId=$userId, ex=$ex, state=$state")
-        throw ExceptionType.withType(MessageType.INVALID_ACTION)
-    }
-    
-    @Retry(name = "user-service")
+    @CircuitBreaker(name = "accountClient", fallbackMethod = "findByIdFallback")
     fun findById(userId: Long): ReadUserInnerResponse {
         val response = restClient.get()
             .uri("/internal/users/{userId}", userId)
@@ -55,8 +44,7 @@ class UserClient(
         return requireNotNull(response) { "User not found for id=$userId" }
     }
 
-    @CircuitBreaker(name = "user-service", fallbackMethod = "getUpdateBalanceFallback")
-    @Retry(name = "user-service")
+    @CircuitBreaker(name = "accountClient", fallbackMethod = "updateBalanceFallback")
     fun updateBalance(userId: Long, balance: Int) {
         val request = UpdateBalanceInnerRequest(balance = balance)
 
@@ -67,16 +55,7 @@ class UserClient(
             .toBodilessEntity()
     }
 
-    fun getUpdateBalanceFallback(userId: Long, balance: Int, ex: Throwable) {
-        val cb = circuitBreakerRegistry.circuitBreaker("user-service")
-        val state = cb.state
-
-        println("existsByIdFallback userId=$userId, ex=$ex, state=$state")
-        throw ExceptionType.withType(MessageType.INVALID_ACTION)
-    }
-
-    @CircuitBreaker(name = "user-service", fallbackMethod = "getUpdateActivePointFallback")
-    @Retry(name = "user-service")
+    @CircuitBreaker(name = "accountClient", fallbackMethod = "updateActivePointFallback")
     fun updateActivePoint(userId: Long, activePoint: Int) {
         val request = UpdateActivePointInnerRequest(activePoint = activePoint)
 
@@ -87,15 +66,7 @@ class UserClient(
             .toBodilessEntity()
     }
 
-    fun getUpdateActivePointFallback(userId: Long, balance: Int, ex: Throwable) {
-        val cb = circuitBreakerRegistry.circuitBreaker("user-service")
-        val state = cb.state
-
-        println("existsByIdFallback userId=$userId, ex=$ex, state=$state")
-        throw ExceptionType.withType(MessageType.INVALID_ACTION)
-    }
-
-    @Retry(name = "user-service")
+    @CircuitBreaker(name = "accountClient", fallbackMethod = "findByIdInFallback")
     fun findByIdIn(userIds: List<Long>): List<ReadUserInnerResponse> {
         val response = restClient.get()
             .uri { builder ->
@@ -110,7 +81,7 @@ class UserClient(
         return response?.users ?: emptyList()
     }
 
-    @Retry(name = "user-service")
+    @CircuitBreaker(name = "accountClient", fallbackMethod = "updateAbusePointFallback")
     fun updateAbusePoint(userId: Long, abusePoint: Int) {
         val request = UpdateAbusePointInnerRequest(abusePoint = abusePoint)
 
@@ -119,5 +90,48 @@ class UserClient(
             .body(request)
             .retrieve()
             .toBodilessEntity()
+    }
+
+    // ===== fallback methods =====
+    @Suppress("unused")
+    private fun existsByIdFallback(userId: Long, ex: Throwable): Boolean {
+        returnStatus("accountClient", ex)
+        throw ExceptionType.withType(MessageType.INVALID_CONNECTED_SERVICE)
+    }
+
+    @Suppress("unused")
+    private fun findByIdFallback(userId: Long, ex: Throwable): ReadUserInnerResponse {
+        returnStatus("accountClient", ex)
+        throw ExceptionType.withType(MessageType.INVALID_CONNECTED_SERVICE)
+    }
+
+    @Suppress("unused")
+    private fun findByIdInFallback(userIds: List<Long>, ex: Throwable): List<ReadUserInnerResponse> {
+        returnStatus("accountClient", ex)
+        throw ExceptionType.withType(MessageType.INVALID_CONNECTED_SERVICE)
+    }
+
+    @Suppress("unused")
+    private fun updateBalanceFallback(userId: Long, balance: Int, ex: Throwable) {
+        returnStatus("accountClient", ex)
+        throw ExceptionType.withType(MessageType.INVALID_CONNECTED_SERVICE)
+    }
+
+    @Suppress("unused")
+    private fun updateActivePointFallback(userId: Long, activePoint: Int, ex: Throwable) {
+        returnStatus("accountClient", ex)
+        throw ExceptionType.withType(MessageType.INVALID_CONNECTED_SERVICE)
+    }
+
+    @Suppress("unused")
+    private fun updateAbusePointFallback(userId: Long, abusePoint: Int, ex: Throwable) {
+        returnStatus("accountClient", ex)
+        throw ExceptionType.withType(MessageType.INVALID_CONNECTED_SERVICE)
+    }
+
+    fun returnStatus(client: String, ex: Throwable) {
+        val cb = circuitBreakerRegistry.circuitBreaker(client)
+        val state = cb.state
+        println("fallback ex=${ex::class.qualifiedName}:${ex.message}, state=$state")
     }
 }

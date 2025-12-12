@@ -26,7 +26,6 @@ class ChatAPI(
     private val chatService: ChatService,
 ) {
     // 채팅방 생성
-    
     @Operation(summary = "채팅방 생성")
     @PostMapping("/chatroom")
     fun createChatroom(
@@ -40,20 +39,17 @@ class ChatAPI(
     }
 
     // 유저 기반 채팅방 조회
-    
     @Operation(summary = "사용자가 제작한 채팅방 조회")
     @GetMapping("/chatroom/user")
     fun readChatroomListByUserId(
         @RequestHeader("X-User-Id") userId: Long,
     ): ResponseEntity<ReadChatroomListOuterResponse> {
-        
         val response = chatService.readChatroomListByUserId(userId)
 
         return ResponseEntity.ok().body(response)
     }
 
     // 이름 기반 채팅방 조회
-    
     @Operation(summary = "이름 기반 채팅방 조회")
     @GetMapping("/chatroom")
     fun readChatroomListByUserIdAndTitleContaining(
@@ -67,7 +63,6 @@ class ChatAPI(
     }
 
     // 채팅방 채팅내역 조회
-    
     @Operation(summary = "채팅 내역 조회")
     @GetMapping("{chatroomId}/chat")
     fun readChatByChatroomId(
@@ -76,20 +71,18 @@ class ChatAPI(
         @RequestParam("page", defaultValue = "0") page: Int,
         @RequestParam("size", defaultValue = "10") size: Int,
     ): ResponseEntity<ReadChatListOuterResponse> {
-        
-
-        val response = chatService.readChatByChatroomId(
-            userId = userId,
-            chatroomId = chatroomId,
-            page = page,
-            size = size
-        )
+        val response =
+            chatService.readChatByChatroomId(
+                userId = userId,
+                chatroomId = chatroomId,
+                page = page,
+                size = size
+            )
 
         return ResponseEntity.ok().body(response)
     }
 
     // 채팅방 채팅내역 조회
-    
     @Operation(summary = "채팅 내역 기반 채팅 조회")
     @PostMapping("{chatroomId}/chat")
     fun readChatContainingByChatroomId(
@@ -98,8 +91,6 @@ class ChatAPI(
         @RequestParam("page", defaultValue = "0") page: Int,
         @RequestBody readChatContainingContentOuterRequest: ReadChatContainingContentOuterRequest
     ): ResponseEntity<ReadChatListOuterResponse> {
-        
-
         val response =
             chatService.readChatContainingByChatroomId(
                 userId = userId,
@@ -113,7 +104,6 @@ class ChatAPI(
     }
 
     // 특정 채팅방 조회
-    
     @Operation(summary = "아이디 기반 채팅방 조회")
     @GetMapping("{chatroomId}/chatroom/summary")
     fun readChatroomSummaryById(
@@ -127,28 +117,24 @@ class ChatAPI(
     }
 
     // 특정 채팅방 접속
-    
     @Operation(summary = "채팅방 입장")
     @PostMapping("/{chatroomId}/join")
     fun joinChatroom(
         @RequestHeader("X-User-Id") userId: Long,
         @PathVariable chatroomId: Long,
     ): ResponseEntity<JoinChatroomOuterResponse> {
-        
         val response = chatService.joinChatroom(userId, chatroomId)
 
         return ResponseEntity.ok().body(response)
     }
 
     // 특정 채팅방 탈퇴
-    
     @Operation(summary = "채팅방 퇴장")
     @PostMapping("/{chatroomId}/leave")
     fun leaveChatroom(
         @RequestHeader("X-User-Id") userId: Long,
         @PathVariable chatroomId: Long,
     ): ResponseEntity<LeaveChatroomOuterResponse> {
-        
         val response = chatService.leaveChatroom(userId, chatroomId)
 
         return ResponseEntity.ok().body(response)
@@ -164,7 +150,9 @@ class ChatAPI(
     ): SendChatResponse {
         println("send Chat")
         val userId = principal.name.toLong()
-        val response = chatService.sendChat(sendChatRequest, chatroomId, userId)
+        val response = chatService.sendChatNew(sendChatRequest, chatroomId, userId)
+//        val response = chatService.sendChat(sendChatRequest, chatroomId, userId)
+//        val response = chatService.sendChatOrigin(sendChatRequest, chatroomId, userId)
 
         return response
     }

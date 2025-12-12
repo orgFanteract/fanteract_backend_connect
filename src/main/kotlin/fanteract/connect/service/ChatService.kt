@@ -1,14 +1,20 @@
 package fanteract.connect.service
 
-import fanteract.connect.client.UserClient
-import fanteract.connect.domain.ChatReader
-import fanteract.connect.domain.ChatWriter
-import fanteract.connect.domain.ChatroomReader
-import fanteract.connect.domain.ChatroomWriter
-import fanteract.connect.domain.UserChatroomHistoryReader
-import fanteract.connect.domain.UserChatroomHistoryWriter
-import fanteract.connect.domain.UserChatroomReader
-import fanteract.connect.domain.UserChatroomWriter
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.fasterxml.jackson.databind.ObjectMapper
+import fanteract.connect.client.AccountClient
+import fanteract.connect.adapter.ChatReader
+import fanteract.connect.adapter.ChatWriter
+import fanteract.connect.adapter.ChatroomReader
+import fanteract.connect.adapter.ChatroomWriter
+import fanteract.connect.adapter.MessageAdapter
+import fanteract.connect.adapter.UserChatroomHistoryReader
+import fanteract.connect.adapter.UserChatroomHistoryWriter
+import fanteract.connect.adapter.UserChatroomReader
+import fanteract.connect.adapter.UserChatroomWriter
+import fanteract.connect.dto.UpdateActivePointRequest
+import fanteract.connect.dto.client.CreateChatRequest
+import fanteract.connect.dto.client.MessageWrapper
 import fanteract.connect.dto.outer.*
 import fanteract.connect.dto.inner.*
 import fanteract.connect.entity.UserChatroom
@@ -16,13 +22,17 @@ import fanteract.connect.enumerate.ActivePoint
 import fanteract.connect.enumerate.Balance
 import fanteract.connect.enumerate.ChatroomJoinStatus
 import fanteract.connect.enumerate.RiskLevel
+import fanteract.connect.enumerate.TopicService
 import fanteract.connect.exception.ExceptionType
 import fanteract.connect.exception.MessageType
 import fanteract.connect.filter.ProfanityFilterService
+import fanteract.connect.util.ChatCountAccumulator
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 import kotlin.Long
 import kotlin.collections.associateBy
 import kotlin.collections.map
@@ -38,8 +48,11 @@ class ChatService(
     private val userChatroomWriter: UserChatroomWriter,
     private val userChatroomHistoryReader: UserChatroomHistoryReader,
     private val userChatroomHistoryWriter: UserChatroomHistoryWriter,
-    private val userClient: UserClient,
-    private val profanityFilterService: ProfanityFilterService
+    private val accountClient: AccountClient,
+    private val outboxConnectService: OutboxConnectService,
+    private val profanityFilterService: ProfanityFilterService,
+    private val chatCountAccumulator: ChatCountAccumulator,
+    private val messageAdapter: MessageAdapter
 ) {
     fun createChatroom(
         userId: Long,
@@ -53,7 +66,6 @@ class ChatService(
             )
 
         // TODO: 해당 채팅방에 참여 상태로 변경
-
 
         return CreateChatroomOuterResponse(
             chatroomId = chatroom.chatroomId,
@@ -96,7 +108,7 @@ class ChatService(
         chatroomReader.existsById(chatroomId)
 
         // 사용자 존재여부 확인
-        userClient.existsById(userId)
+        accountClient.existsById(userId)
 
         // 채팅방 접속기록 확인
         val preUserChatroom = userChatroomReader.findByUserIdAndChatroomId(userId, chatroomId)
@@ -124,7 +136,7 @@ class ChatService(
         chatroomReader.existsById(chatroomId)
 
         // 사용자 존재여부 확인
-        userClient.existsById(userId)
+        accountClient.existsById(userId)
 
         // 채팅방 접속기록 확인
         val preUserChatroom = userChatroomReader.findByUserIdAndChatroomId(userId, chatroomId)
@@ -144,49 +156,189 @@ class ChatService(
 
         return LeaveChatroomOuterResponse(userChatroom.userChatroomId)
     }
+
+    @Scheduled(fixedDelay = 1000)
+    fun updateChatCount(){
+        val chatCounterMap = chatCountAccumulator.drain()
+
+        if (chatCounterMap.isEmpty())
+            return
+
+        chatCounterMap.forEach { (chatroomId, delta) ->
+            chatroomWriter.incrementChatCount(chatroomId, delta)
+        }
+    }
+
+    // 아웃박스 패턴 제거 및 채팅 수 업데이트 개선
+    fun sendChatNew(
+        sendChatRequest: SendChatRequest,
+        chatroomId: Long,
+        userId: Long
+    ): SendChatResponse {
+        // 비용 검증 및 차감
+        val user = accountClient.findById(userId)
+
+        if (user.balance < Balance.CHAT.cost){
+            throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
+        }
+
+        accountClient.updateBalance(userId, -Balance.CHAT.cost)
+
+        // 게시글 필터링 진행
+        val riskLevel =
+            profanityFilterService
+                .checkProfanityAndUpdateAbusePoint(
+                    userId = userId,
+                    text = sendChatRequest.content,
+                )
+
+        // 채팅 내역 비동기 전송
+        messageAdapter.sendMessageUsingBroker(
+            message =
+                CreateChatRequest(
+                    content = sendChatRequest.content,
+                    chatroomId = chatroomId,
+                    userId = userId,
+                    riskLevel = riskLevel,
+                ),
+            topicService = TopicService.CONNECT_SERVICE,
+            methodName = "createChat"
+        )
+
+        // 채팅방 메타데이터 갱신
+        chatCountAccumulator.increase(chatroomId)
+
+
+        // 활동 점수 변경을 비동기 방식으로 진행
+        if (riskLevel != RiskLevel.BLOCK) {
+            messageAdapter.sendMessageUsingBroker(
+                message =
+                    UpdateActivePointRequest(
+                        userId = userId,
+                        activePoint = ActivePoint.CHAT.point
+                    ),
+                topicService = TopicService.ACCOUNT_SERVICE,
+                methodName = "updateActivePoint"
+            )
+        }
+
+        // 결과를 구독자에게 전송
+        return SendChatResponse(
+            chatId = null,
+            userName = user.name,
+            content = sendChatRequest.content,
+            createdAt = LocalDateTime.now(),
+            riskLevel = riskLevel,
+            sentAt = sendChatRequest.sentAt,
+        )
+    }
     fun sendChat(
         sendChatRequest: SendChatRequest,
         chatroomId: Long,
         userId: Long
     ): SendChatResponse {
         // 비용 검증 및 차감
-        val user = userClient.findById(userId)
+        val user = accountClient.findById(userId)
         
         if (user.balance < Balance.CHAT.cost){
             throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
         }
 
-        userClient.updateBalance(userId, -Balance.CHAT.cost)
+        accountClient.updateBalance(userId, -Balance.CHAT.cost)
         
         // 게시글 필터링 진행
         val riskLevel =
-            profanityFilterService.checkProfanityAndUpdateAbusePoint(
-                userId = userId,
-                text = sendChatRequest.content,
-            )
+            profanityFilterService
+                .checkProfanityAndUpdateAbusePoint(
+                    userId = userId,
+                    text = sendChatRequest.content,
+                )
 
-        val chat =
-            chatWriter.create(
-                content = sendChatRequest.content,
+        // 채팅 수 증가(동기)와 채팅 내역 저장(비동기)을 아웃박스 패턴으로 연결
+        outboxConnectService
+            .increaseChatCountAndCreateChat(
                 chatroomId = chatroomId,
+                content = sendChatRequest.content,
                 userId = userId,
                 riskLevel = riskLevel,
             )
 
-        // 활동 점수 변경
+        // 활동 점수 변경을 비동기 방식으로 진행
         if (riskLevel != RiskLevel.BLOCK) {
-            userClient.updateActivePoint(
-                userId = userId,
-                activePoint = ActivePoint.CHAT.point
+            chatWriter.sendMessageUsingMessage(
+                content = MessageWrapper(
+                    methodName = "updateActivePoint",
+                    content =
+                        UpdateActivePointRequest(
+                            userId = userId,
+                            activePoint = ActivePoint.CHAT.point
+                        )
+                ),
+                topicService = TopicService.ACCOUNT_SERVICE,
+                methodName = "updateActivePoint",
             )
         }
 
+        // 결과를 구독자에게 전송
         return SendChatResponse(
-            chatId = chat.chatId,
+            chatId = null,
             userName = user.name,
-            content = chat.content,
-            createdAt = chat.createdAt!!,
+            content = sendChatRequest.content,
+            createdAt = LocalDateTime.now(),
             riskLevel = riskLevel,
+            sentAt = sendChatRequest.sentAt,
+        )
+    }
+
+    fun sendChatOrigin(
+        sendChatRequest: SendChatRequest,
+        chatroomId: Long,
+        userId: Long
+    ): SendChatResponse {
+        // 비용 검증 및 차감
+        val user = accountClient.findById(userId)
+
+        if (user.balance < Balance.CHAT.cost){
+            throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
+        }
+
+        accountClient.updateBalance(userId, -Balance.CHAT.cost)
+
+        // 게시글 필터링 진행
+        val riskLevel =
+            profanityFilterService
+                .checkProfanityAndUpdateAbusePoint(
+                    userId = userId,
+                    text = sendChatRequest.content,
+                )
+
+        // 채팅룸 정보 갱신
+        chatroomWriter.increaseChatCount(chatroomId)
+
+        // 채팅 내역 생성
+        chatWriter.create(
+            chatroomId = chatroomId,
+            content = sendChatRequest.content,
+            userId = userId,
+            riskLevel = riskLevel,
+        )
+
+        // 활동 점수 변경
+        if (riskLevel != RiskLevel.BLOCK) {
+            accountClient.updateActivePoint(
+                userId = userId,
+                activePoint = ActivePoint.CHAT.point,
+            )
+        }
+
+        // 결과를 구독자에게 전송
+        return SendChatResponse(
+            chatId = null,
+            userName = user.name,
+            content = sendChatRequest.content,
+            createdAt = LocalDateTime.now(),
+            riskLevel = riskLevel,
+            sentAt = sendChatRequest.sentAt,
         )
     }
 
@@ -263,7 +415,7 @@ class ChatService(
             pageable = pageable
         )
 
-        val userMap = userClient.findByIdIn(chatPage.content.map {it.userId}).associateBy {it.userId }
+        val userMap = accountClient.findByIdIn(chatPage.content.map {it.userId}).associateBy {it.userId }
 
         val contents = chatPage.content.map { chat ->
             val user = userMap[chat.userId]
@@ -305,7 +457,7 @@ class ChatService(
             pageable = pageable
         )
 
-        val userMap = userClient.findByIdIn(chatPage.content.map {it.userId}).associateBy {it.userId }
+        val userMap = accountClient.findByIdIn(chatPage.content.map {it.userId}).associateBy {it.userId }
 
         val contents = chatPage.content.map { chat ->
             val user = userMap[chat.userId]

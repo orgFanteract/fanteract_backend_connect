@@ -1,4 +1,4 @@
-package fanteract.connect.domain
+package fanteract.connect.adapter
 
 import fanteract.connect.repo.UserChatroomHistoryRepo
 import org.springframework.stereotype.Component
