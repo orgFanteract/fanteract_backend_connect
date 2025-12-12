@@ -46,7 +46,6 @@ class ChatAPI(
     fun readChatroomListByUserId(
         @RequestHeader("X-User-Id") userId: Long,
     ): ResponseEntity<ReadChatroomListOuterResponse> {
-        
         val response = chatService.readChatroomListByUserId(userId)
 
         return ResponseEntity.ok().body(response)
@@ -164,7 +163,9 @@ class ChatAPI(
     ): SendChatResponse {
         println("send Chat")
         val userId = principal.name.toLong()
-        val response = chatService.sendChat(sendChatRequest, chatroomId, userId)
+        val response = chatService.sendChatNew(sendChatRequest, chatroomId, userId)
+//        val response = chatService.sendChat(sendChatRequest, chatroomId, userId)
+//        val response = chatService.sendChatOrigin(sendChatRequest, chatroomId, userId)
 
         return response
     }

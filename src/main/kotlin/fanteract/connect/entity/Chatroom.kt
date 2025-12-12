@@ -15,5 +15,6 @@ class Chatroom (
     val chatroomId: Long = 0L,
     val title: String,
     val description: String?,
+    var chatCount: Long = 0L,
     val userId: Long,
 ): BaseEntity()

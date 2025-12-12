@@ -47,4 +47,5 @@ data class SendChatResponse(
     val content: String? = null,
     val createdAt: LocalDateTime? = null,
     val riskLevel: RiskLevel,
+    val sentAt: Long? = null,
 )

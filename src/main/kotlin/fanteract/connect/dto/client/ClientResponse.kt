@@ -1,5 +1,6 @@
 package fanteract.connect.dto.client
 
+import fanteract.connect.enumerate.RiskLevel
 import java.time.LocalDateTime
 
 data class ReadUserExistsInnerResponse(
@@ -19,4 +20,11 @@ data class ReadUserInnerResponse(
 
 data class ReadUserListInnerResponse(
     val users: List<ReadUserInnerResponse>
+)
+
+data class CreateChatResponse(
+    val content: String,
+    val chatroomId: Long,
+    val userId: Long,
+    val riskLevel: RiskLevel,
 )

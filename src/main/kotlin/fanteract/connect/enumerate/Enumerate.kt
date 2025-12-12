@@ -47,3 +47,15 @@ enum class ContentType{
     BOARD_HEART,
     COMMENT_HEART,
 }
+
+enum class OutboxStatus{
+    NEW,
+    SENT,
+    FAILED
+}
+
+enum class TopicService{
+    SOCIAL_SERVICE,
+    CONNECT_SERVICE,
+    ACCOUNT_SERVICE,
+}

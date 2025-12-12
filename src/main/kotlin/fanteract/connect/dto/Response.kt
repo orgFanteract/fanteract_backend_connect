@@ -18,6 +18,7 @@ data class UpdateBalanceRequest(
 )
 
 data class UpdateActivePointRequest(
+    val userId: Long,
     val activePoint: Int,
 )
 

@@ -25,6 +25,6 @@ class WebSocketConfig(
     }
 
     override fun configureClientInboundChannel(registration: ChannelRegistration) {
-        registration.interceptors(stompAuthChannelInterceptor)   // ✅ 여기
+        registration.interceptors(stompAuthChannelInterceptor)
     }
 }
