@@ -3,15 +3,17 @@ package fanteract.connect.service
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import fanteract.connect.client.AccountClient
-import fanteract.connect.domain.ChatReader
-import fanteract.connect.domain.ChatWriter
-import fanteract.connect.domain.ChatroomReader
-import fanteract.connect.domain.ChatroomWriter
-import fanteract.connect.domain.UserChatroomHistoryReader
-import fanteract.connect.domain.UserChatroomHistoryWriter
-import fanteract.connect.domain.UserChatroomReader
-import fanteract.connect.domain.UserChatroomWriter
+import fanteract.connect.adapter.ChatReader
+import fanteract.connect.adapter.ChatWriter
+import fanteract.connect.adapter.ChatroomReader
+import fanteract.connect.adapter.ChatroomWriter
+import fanteract.connect.adapter.MessageAdapter
+import fanteract.connect.adapter.UserChatroomHistoryReader
+import fanteract.connect.adapter.UserChatroomHistoryWriter
+import fanteract.connect.adapter.UserChatroomReader
+import fanteract.connect.adapter.UserChatroomWriter
 import fanteract.connect.dto.UpdateActivePointRequest
+import fanteract.connect.dto.client.CreateChatRequest
 import fanteract.connect.dto.client.MessageWrapper
 import fanteract.connect.dto.outer.*
 import fanteract.connect.dto.inner.*
@@ -50,6 +52,7 @@ class ChatService(
     private val outboxConnectService: OutboxConnectService,
     private val profanityFilterService: ProfanityFilterService,
     private val chatCountAccumulator: ChatCountAccumulator,
+    private val messageAdapter: MessageAdapter
 ) {
     fun createChatroom(
         userId: Long,
@@ -63,7 +66,6 @@ class ChatService(
             )
 
         // TODO: 해당 채팅방에 참여 상태로 변경
-
 
         return CreateChatroomOuterResponse(
             chatroomId = chatroom.chatroomId,
@@ -191,26 +193,32 @@ class ChatService(
                 )
 
         // 채팅 내역 비동기 전송
-        chatWriter.createUsingMessageBrokerWithChatCounter(
-            chatroomId = chatroomId,
-            content = sendChatRequest.content,
-            userId = userId,
-            riskLevel = riskLevel,
+        messageAdapter.sendMessageUsingBroker(
+            message =
+                CreateChatRequest(
+                    content = sendChatRequest.content,
+                    chatroomId = chatroomId,
+                    userId = userId,
+                    riskLevel = riskLevel,
+                ),
+            topicService = TopicService.CONNECT_SERVICE,
+            methodName = "createChat"
         )
+
+        // 채팅방 메타데이터 갱신
+        chatCountAccumulator.increase(chatroomId)
+
 
         // 활동 점수 변경을 비동기 방식으로 진행
         if (riskLevel != RiskLevel.BLOCK) {
-            chatWriter.sendMessageUsingMessage(
-                content = MessageWrapper(
-                    methodName = "updateActivePoint",
-                    content =
-                        UpdateActivePointRequest(
-                            userId = userId,
-                            activePoint = ActivePoint.CHAT.point
-                        )
-                ),
+            messageAdapter.sendMessageUsingBroker(
+                message =
+                    UpdateActivePointRequest(
+                        userId = userId,
+                        activePoint = ActivePoint.CHAT.point
+                    ),
                 topicService = TopicService.ACCOUNT_SERVICE,
-                methodName = "updateActivePoint",
+                methodName = "updateActivePoint"
             )
         }
 
@@ -531,15 +539,5 @@ class ChatService(
             totalPages = chatPage.totalPages,
             hasNext = chatPage.hasNext()
         )
-    }
-
-    fun toJson(any: Any): String{
-        val objectMapper = ObjectMapper()
-
-        try{
-            return objectMapper.writeValueAsString(any)
-        } catch (e: JsonProcessingException) {
-            throw RuntimeException("제이슨 직렬화 실패")
-        }
     }
 }

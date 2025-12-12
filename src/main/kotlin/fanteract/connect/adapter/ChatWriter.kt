@@ -1,4 +1,4 @@
-package fanteract.connect.domain
+package fanteract.connect.adapter
 
 import fanteract.connect.dto.client.CreateChatRequest
 import fanteract.connect.dto.client.MessageWrapper
@@ -33,59 +33,6 @@ class ChatWriter(
                 riskLevel = riskLevel,
             )
         )
-    }
-
-    fun createWithChatCounter(
-        content: String,
-        chatroomId: Long,
-        userId: Long,
-        riskLevel: RiskLevel,
-    ): Chat {
-        val chat = create(
-            content = content,
-            chatroomId = chatroomId,
-            userId = userId,
-            riskLevel = riskLevel,
-        )
-
-        chatCountAccumulator.increase(chatroomId)
-        return chat
-
-    }
-
-    fun createUsingMessageBroker(
-        content: String,
-        chatroomId: Long,
-        userId: Long,
-        riskLevel: RiskLevel
-    ) {
-        val content = MessageWrapper("createChat",
-            CreateChatRequest(
-                content = content,
-                chatroomId = chatroomId,
-                userId = userId,
-                riskLevel = riskLevel,
-            )
-        )
-        val jsonContent = BaseUtil.toJson(content)
-
-        val base64Content = Base64.getEncoder().encodeToString(jsonContent.toByteArray())
-
-        kafkaTemplate.send(
-            "${TopicService.CONNECT_SERVICE}.createChat",
-            base64Content
-        )
-    }
-
-    fun createUsingMessageBrokerWithChatCounter(
-        content: String,
-        chatroomId: Long,
-        userId: Long,
-        riskLevel: RiskLevel
-    ){
-        createUsingMessageBroker(content, chatroomId, userId, riskLevel)
-        // 채팅 수 갱신
-        chatCountAccumulator.increase(chatroomId)
     }
 
     fun <T : Any>sendMessageUsingMessage(

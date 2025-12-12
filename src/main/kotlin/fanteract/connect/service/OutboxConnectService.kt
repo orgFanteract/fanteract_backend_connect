@@ -1,8 +1,8 @@
 package fanteract.connect.service
 
-import fanteract.connect.domain.ChatReader
-import fanteract.connect.domain.ChatWriter
-import fanteract.connect.domain.ChatroomWriter
+import fanteract.connect.adapter.ChatReader
+import fanteract.connect.adapter.ChatWriter
+import fanteract.connect.adapter.ChatroomWriter
 import fanteract.connect.dto.client.CreateChatRequest
 import fanteract.connect.dto.client.MessageWrapper
 import fanteract.connect.entity.OutboxConnect
@@ -13,7 +13,6 @@ import fanteract.connect.repo.OutboxConnectRepo
 import fanteract.connect.util.BaseUtil
 import org.springframework.stereotype.Service
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.transaction.annotation.Transactional
 import java.util.Base64
 import kotlin.String

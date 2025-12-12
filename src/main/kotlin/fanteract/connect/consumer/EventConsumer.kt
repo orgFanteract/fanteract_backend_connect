@@ -18,7 +18,7 @@ class EventConsumer(
         topics = ["CONNECT_SERVICE.createChat"],
         groupId = "connect-service"
     )
-    fun consume(message: String){
+    fun consumeCreateChat(message: String){
         println("consumed")
         println(message)
         val decodedJson = String(Base64.getDecoder().decode(message))
