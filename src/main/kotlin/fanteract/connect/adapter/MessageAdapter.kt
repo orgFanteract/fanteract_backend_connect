@@ -25,9 +25,10 @@ class MessageAdapter(
 
         val baseContent = Base64.getEncoder().encodeToString(BaseUtil.Companion.toJson(content).toByteArray())
 
-        kafkaTemplate.send(
-            "$topicService.$methodName",
-            baseContent
-        ).get()
+        kafkaTemplate
+            .send(
+                "$topicService.$methodName",
+                baseContent,
+            ).get()
     }
 }

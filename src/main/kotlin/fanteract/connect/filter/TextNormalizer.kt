@@ -1,11 +1,9 @@
 package fanteract.connect.filter
 
-
 import org.springframework.stereotype.Component
 
 @Component
 class TextNormalizer {
-
     fun normalize(raw: String): String {
         // 1) 소문자
         var text = raw.lowercase()

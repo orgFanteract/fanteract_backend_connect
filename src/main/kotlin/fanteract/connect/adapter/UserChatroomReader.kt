@@ -8,10 +8,13 @@ import org.springframework.stereotype.Component
 class UserChatroomReader(
     private val userChatroomRepo: UserChatroomRepo,
 ) {
-    fun findByUserIdAndChatroomId(userId: Long, chatroomId: Long): UserChatroom? {
-        return userChatroomRepo.findByUserIdAndChatroomId(
-            userId = userId,
-            chatroomId = chatroomId,
-        ).firstOrNull()
-    }
+    fun findByUserIdAndChatroomId(
+        userId: Long,
+        chatroomId: Long,
+    ): UserChatroom? =
+        userChatroomRepo
+            .findByUserIdAndChatroomId(
+                userId = userId,
+                chatroomId = chatroomId,
+            ).firstOrNull()
 }

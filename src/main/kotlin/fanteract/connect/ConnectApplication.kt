@@ -11,5 +11,5 @@ import org.springframework.scheduling.annotation.EnableScheduling
 class ConnectApplication
 
 fun main(args: Array<String>) {
-	runApplication<ConnectApplication>(*args)
+    runApplication<ConnectApplication>(*args)
 }

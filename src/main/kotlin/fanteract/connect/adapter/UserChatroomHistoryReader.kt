@@ -6,6 +6,4 @@ import org.springframework.stereotype.Component
 @Component
 class UserChatroomHistoryReader(
     private val userChatroomHistoryRepo: UserChatroomHistoryRepo,
-) {
-
-}
+)

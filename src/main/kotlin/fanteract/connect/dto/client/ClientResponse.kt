@@ -19,7 +19,7 @@ data class ReadUserInnerResponse(
 )
 
 data class ReadUserListInnerResponse(
-    val users: List<ReadUserInnerResponse>
+    val users: List<ReadUserInnerResponse>,
 )
 
 data class CreateChatResponse(

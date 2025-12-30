@@ -1,9 +1,9 @@
 package fanteract.connect.filter
 
-import mu.KotlinLogging
 import fanteract.connect.client.AccountClient
 import fanteract.connect.dto.FilterResult
 import fanteract.connect.enumerate.RiskLevel
+import mu.KotlinLogging
 import org.springframework.stereotype.Service
 
 @Service
@@ -20,9 +20,7 @@ class ProfanityFilterService(
 
         if (ruleResult.action == RiskLevel.BLOCK) {
             return ruleResult
-        }
-
-        else if (ruleResult.action == RiskLevel.WARN) {
+        } else if (ruleResult.action == RiskLevel.WARN) {
             return ruleResult
         }
 
@@ -30,22 +28,25 @@ class ProfanityFilterService(
         val score = mlToxicityClient.getToxicityScore(text)
 
         return when {
-            score >= 0.9 -> FilterResult(
-                action = RiskLevel.BLOCK,
-                reason = "ML: 고위험 공격성 감지",
-                score = score
-            )
+            score >= 0.9 ->
+                FilterResult(
+                    action = RiskLevel.BLOCK,
+                    reason = "ML: 고위험 공격성 감지",
+                    score = score,
+                )
 
-            score >= 0.6 -> FilterResult(
-                action = RiskLevel.WARN,
-                reason = "ML: 중간 수준 공격성 감지",
-                score = score
-            )
+            score >= 0.6 ->
+                FilterResult(
+                    action = RiskLevel.WARN,
+                    reason = "ML: 중간 수준 공격성 감지",
+                    score = score,
+                )
 
-            else -> FilterResult(
-                action = RiskLevel.ALLOW,
-                score = score
-            )
+            else ->
+                FilterResult(
+                    action = RiskLevel.ALLOW,
+                    score = score,
+                )
         }
     }
 
@@ -59,7 +60,7 @@ class ProfanityFilterService(
             RiskLevel.BLOCK -> {
                 accountClient.updateAbusePoint(
                     userId = userId,
-                    abusePoint = 10
+                    abusePoint = 10,
                 )
 
                 log.warn { "부적절한 표현이 포함되어 부정 점수가 10점 적용되었습니다" }
@@ -68,14 +69,13 @@ class ProfanityFilterService(
             RiskLevel.WARN -> {
                 accountClient.updateAbusePoint(
                     userId = userId,
-                    abusePoint = 5
+                    abusePoint = 5,
                 )
 
                 log.warn { "부적절한 표현이 포함되어 부정 점수가 5점 적용되었습니다. 게시는 진행됩니다." }
             }
 
             else -> {
-
             }
         }
 

@@ -12,14 +12,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 class WebSocketConfig(
     private val stompAuthChannelInterceptor: StompAuthChannelInterceptor,
-): WebSocketMessageBrokerConfigurer {
+) : WebSocketMessageBrokerConfigurer {
     override fun configureMessageBroker(registry: MessageBrokerRegistry) {
         registry.enableSimpleBroker("/subscribe") // 인메모리 브로커. 구독할 주소 프리픽스
         registry.setApplicationDestinationPrefixes("/publish") // 생산할 주소 프리픽스
     }
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
-        registry.addEndpoint("/ws-connect") // 초기 연결 과정
+        registry
+            .addEndpoint("/ws-connect") // 초기 연결 과정
             .setAllowedOriginPatterns("*")
             .withSockJS()
     }
