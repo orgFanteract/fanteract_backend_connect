@@ -11,14 +11,14 @@ import fanteract.connect.enumerate.RiskLevel
 import fanteract.connect.enumerate.TopicService
 import fanteract.connect.repo.OutboxConnectRepo
 import fanteract.connect.util.BaseUtil
-import org.springframework.stereotype.Service
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.Base64
 import kotlin.String
 
 @Service
-
 class OutboxConnectService(
     private val outboxConnectRepo: OutboxConnectRepo,
     private val kafkaTemplate: KafkaTemplate<String, String>,
@@ -26,10 +26,8 @@ class OutboxConnectService(
     private val chatWriter: ChatWriter,
     private val chatroomWriter: ChatroomWriter,
 ) {
-    /*
     @Scheduled(fixedDelay = 1000)
-    fun sendToMessageBroker(){
-        println("sendToMessageBroker begin")
+    fun sendToMessageBroker() {
         // 토픽 : 서비스 이름, 벨류 : 대상 서비스 메서드 이름 + 매개변수
         // 아직 처리되지 않은 메세지 조회
         val outboxMessageList = outboxConnectRepo.findAllByOutboxStatusOrderByCreatedAtDesc(OutboxStatus.NEW)
@@ -40,26 +38,25 @@ class OutboxConnectService(
     }
 
     @Transactional
-    fun sendOneMessage(message: OutboxConnect){
+    fun sendOneMessage(message: OutboxConnect) {
         try {
             // 메세지 브로커로 메세지 전송 및 동기적으로 결과 확인
-            kafkaTemplate.send(
-                message.topic,
-                message.content
-            ).get()
+            kafkaTemplate
+                .send(
+                    message.topic,
+                    message.content,
+                ).get()
 
             // 전송 성공 시
             message.outboxStatus = OutboxStatus.SENT
-
         } catch (ex: Exception) {
             // 전송 실패 시
             message.outboxStatus = OutboxStatus.FAILED
         }
 
         outboxConnectRepo.save(message)
-    }*/
+    }
 
-    /*
     @Scheduled(fixedDelay = 1000)
     @Transactional
     fun sendToMessageBrokerNew() {
@@ -87,14 +84,14 @@ class OutboxConnectService(
         if (failedIds.isNotEmpty()) {
             outboxConnectRepo.bulkUpdateStatus(OutboxStatus.FAILED, failedIds)
         }
-    }*/
+    }
 
     @Transactional
-    fun <T: Any> createMessage(
+    fun <T : Any> createMessage(
         content: T,
         topicService: TopicService,
         methodName: String,
-    ){
+    ) {
         // 컨텐츠를 JSON으로 변경
         val jsonContent = BaseUtil.toJson(content)
 
@@ -102,7 +99,7 @@ class OutboxConnectService(
         val baseContent = Base64.getEncoder().encodeToString(jsonContent.toByteArray())
 
         // 토픽 생성
-        val topic = "${topicService}.${methodName}"
+        val topic = "$topicService.$methodName"
 
         // 생성
         outboxConnectRepo.save(
@@ -110,7 +107,7 @@ class OutboxConnectService(
                 content = baseContent,
                 topic = topic,
                 outboxStatus = OutboxStatus.NEW,
-            )
+            ),
         )
     }
 

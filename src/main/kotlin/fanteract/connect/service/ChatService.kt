@@ -2,7 +2,6 @@ package fanteract.connect.service
 
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
-import fanteract.connect.client.AccountClient
 import fanteract.connect.adapter.ChatReader
 import fanteract.connect.adapter.ChatWriter
 import fanteract.connect.adapter.ChatroomReader
@@ -12,21 +11,25 @@ import fanteract.connect.adapter.UserChatroomHistoryReader
 import fanteract.connect.adapter.UserChatroomHistoryWriter
 import fanteract.connect.adapter.UserChatroomReader
 import fanteract.connect.adapter.UserChatroomWriter
+import fanteract.connect.client.AccountClient
 import fanteract.connect.dto.UpdateActivePointRequest
 import fanteract.connect.dto.client.CreateChatRequest
 import fanteract.connect.dto.client.MessageWrapper
-import fanteract.connect.dto.outer.*
+import fanteract.connect.dto.client.WriteCommentForUserRequest
 import fanteract.connect.dto.inner.*
+import fanteract.connect.dto.outer.*
 import fanteract.connect.entity.UserChatroom
 import fanteract.connect.enumerate.ActivePoint
 import fanteract.connect.enumerate.Balance
 import fanteract.connect.enumerate.ChatroomJoinStatus
 import fanteract.connect.enumerate.RiskLevel
 import fanteract.connect.enumerate.TopicService
+import fanteract.connect.enumerate.WriteStatus
 import fanteract.connect.exception.ExceptionType
 import fanteract.connect.exception.MessageType
 import fanteract.connect.filter.ProfanityFilterService
 import fanteract.connect.util.ChatCountAccumulator
+import fanteract.connect.util.DeltaInMemoryStorage
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.scheduling.annotation.Scheduled
@@ -52,11 +55,12 @@ class ChatService(
     private val outboxConnectService: OutboxConnectService,
     private val profanityFilterService: ProfanityFilterService,
     private val chatCountAccumulator: ChatCountAccumulator,
-    private val messageAdapter: MessageAdapter
+    private val messageAdapter: MessageAdapter,
+    private val deltaInMemoryStorage: DeltaInMemoryStorage,
 ) {
     fun createChatroom(
         userId: Long,
-        createChatroomOuterRequest: CreateChatroomOuterRequest
+        createChatroomOuterRequest: CreateChatroomOuterRequest,
     ): CreateChatroomOuterResponse {
         val chatroom =
             chatroomWriter.create(
@@ -67,14 +71,30 @@ class ChatService(
 
         // TODO: 해당 채팅방에 참여 상태로 변경
 
+        val flag = false
+
+        if (flag) {
+            // 카프카 기반 쓰기 행위 메세지 전달
+            messageAdapter.sendMessageUsingBroker(
+                message =
+                    WriteCommentForUserRequest(
+                        userId = userId,
+                        writeStatus = WriteStatus.CREATED,
+                        riskLevel = RiskLevel.ALLOW,
+                    ),
+                topicService = TopicService.CONNECT_SERVICE,
+                methodName = "createChatroomForUser",
+            )
+        } else {
+            deltaInMemoryStorage.addDelta(userId, "chatroomCount", 1)
+        }
+
         return CreateChatroomOuterResponse(
             chatroomId = chatroom.chatroomId,
         )
     }
 
-    fun readChatroomListByUserId(
-        userId: Long
-    ):ReadChatroomListOuterResponse {
+    fun readChatroomListByUserId(userId: Long): ReadChatroomListOuterResponse {
         val chatroomList = chatroomReader.findByUserId(userId)
 
         return ReadChatroomListOuterResponse(
@@ -84,9 +104,10 @@ class ChatService(
                     title = it.title,
                     description = it.description,
                 )
-            }
+            },
         )
     }
+
     fun readChatroomSummaryById(
         userId: Long,
         chatroomId: Long,
@@ -102,7 +123,7 @@ class ChatService(
 
     fun joinChatroom(
         userId: Long,
-        chatroomId: Long
+        chatroomId: Long,
     ): JoinChatroomOuterResponse {
         // 채팅방 존재여부 확인
         chatroomReader.existsById(chatroomId)
@@ -114,7 +135,7 @@ class ChatService(
         val preUserChatroom = userChatroomReader.findByUserIdAndChatroomId(userId, chatroomId)
 
         // 접속 기록이 존재하는지 확인
-        if (preUserChatroom != null && preUserChatroom.chatroomJoinStatus == ChatroomJoinStatus.JOIN){
+        if (preUserChatroom != null && preUserChatroom.chatroomJoinStatus == ChatroomJoinStatus.JOIN) {
             throw ExceptionType.withType(MessageType.ALREADY_JOINED)
         }
 
@@ -128,9 +149,10 @@ class ChatService(
 
         return JoinChatroomOuterResponse(userChatroom.userChatroomId)
     }
+
     fun leaveChatroom(
         userId: Long,
-        chatroomId: Long
+        chatroomId: Long,
     ): LeaveChatroomOuterResponse {
         // 채팅방 존재여부 확인
         chatroomReader.existsById(chatroomId)
@@ -142,7 +164,7 @@ class ChatService(
         val preUserChatroom = userChatroomReader.findByUserIdAndChatroomId(userId, chatroomId)
 
         // 접속 기록이 존재하는지 확인
-        if (preUserChatroom == null || preUserChatroom.chatroomJoinStatus == ChatroomJoinStatus.LEAVE){
+        if (preUserChatroom == null || preUserChatroom.chatroomJoinStatus == ChatroomJoinStatus.LEAVE) {
             throw ExceptionType.withType(MessageType.ALREADY_LEFT)
         }
 
@@ -158,11 +180,12 @@ class ChatService(
     }
 
     @Scheduled(fixedDelay = 1000)
-    fun updateChatCount(){
+    fun updateChatCount() {
         val chatCounterMap = chatCountAccumulator.drain()
 
-        if (chatCounterMap.isEmpty())
+        if (chatCounterMap.isEmpty()) {
             return
+        }
 
         chatCounterMap.forEach { (chatroomId, delta) ->
             chatroomWriter.incrementChatCount(chatroomId, delta)
@@ -173,12 +196,12 @@ class ChatService(
     fun sendChatNew(
         sendChatRequest: SendChatRequest,
         chatroomId: Long,
-        userId: Long
+        userId: Long,
     ): SendChatResponse {
         // 비용 검증 및 차감
         val user = accountClient.findById(userId)
 
-        if (user.balance < Balance.CHAT.cost){
+        if (user.balance < Balance.CHAT.cost) {
             throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
         }
 
@@ -202,12 +225,11 @@ class ChatService(
                     riskLevel = riskLevel,
                 ),
             topicService = TopicService.CONNECT_SERVICE,
-            methodName = "createChat"
+            methodName = "createChat",
         )
 
         // 채팅방 메타데이터 갱신
         chatCountAccumulator.increase(chatroomId)
-
 
         // 활동 점수 변경을 비동기 방식으로 진행
         if (riskLevel != RiskLevel.BLOCK) {
@@ -215,11 +237,33 @@ class ChatService(
                 message =
                     UpdateActivePointRequest(
                         userId = userId,
-                        activePoint = ActivePoint.CHAT.point
+                        activePoint = ActivePoint.CHAT.point,
                     ),
                 topicService = TopicService.ACCOUNT_SERVICE,
-                methodName = "updateActivePoint"
+                methodName = "updateActivePoint",
             )
+        }
+
+        val flag = false
+
+        if (flag) {
+            // 카프카 기반 쓰기 행위 메세지 전달
+            messageAdapter.sendMessageUsingBroker(
+                message =
+                    WriteCommentForUserRequest(
+                        userId = userId,
+                        writeStatus = WriteStatus.CREATED,
+                        riskLevel = riskLevel,
+                    ),
+                topicService = TopicService.CONNECT_SERVICE,
+                methodName = "createChatForUser",
+            )
+        } else {
+            deltaInMemoryStorage.addDelta(userId, "chatCount", 1)
+
+            if (riskLevel == RiskLevel.BLOCK) {
+                deltaInMemoryStorage.addDelta(userId, "restrictedChatCount", 1)
+            }
         }
 
         // 결과를 구독자에게 전송
@@ -232,20 +276,21 @@ class ChatService(
             sentAt = sendChatRequest.sentAt,
         )
     }
+
     fun sendChat(
         sendChatRequest: SendChatRequest,
         chatroomId: Long,
-        userId: Long
+        userId: Long,
     ): SendChatResponse {
         // 비용 검증 및 차감
         val user = accountClient.findById(userId)
-        
-        if (user.balance < Balance.CHAT.cost){
+
+        if (user.balance < Balance.CHAT.cost) {
             throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
         }
 
         accountClient.updateBalance(userId, -Balance.CHAT.cost)
-        
+
         // 게시글 필터링 진행
         val riskLevel =
             profanityFilterService
@@ -266,14 +311,15 @@ class ChatService(
         // 활동 점수 변경을 비동기 방식으로 진행
         if (riskLevel != RiskLevel.BLOCK) {
             chatWriter.sendMessageUsingMessage(
-                content = MessageWrapper(
-                    methodName = "updateActivePoint",
-                    content =
-                        UpdateActivePointRequest(
-                            userId = userId,
-                            activePoint = ActivePoint.CHAT.point
-                        )
-                ),
+                content =
+                    MessageWrapper(
+                        methodName = "updateActivePoint",
+                        content =
+                            UpdateActivePointRequest(
+                                userId = userId,
+                                activePoint = ActivePoint.CHAT.point,
+                            ),
+                    ),
                 topicService = TopicService.ACCOUNT_SERVICE,
                 methodName = "updateActivePoint",
             )
@@ -293,12 +339,12 @@ class ChatService(
     fun sendChatOrigin(
         sendChatRequest: SendChatRequest,
         chatroomId: Long,
-        userId: Long
+        userId: Long,
     ): SendChatResponse {
         // 비용 검증 및 차감
         val user = accountClient.findById(userId)
 
-        if (user.balance < Balance.CHAT.cost){
+        if (user.balance < Balance.CHAT.cost) {
             throw ExceptionType.withType(MessageType.NOT_ENOUGH_BALANCE)
         }
 
@@ -352,17 +398,18 @@ class ChatService(
                 userChatroomId = preUserChatroom.userChatroomId,
                 userId = preUserChatroom.userId,
                 chatroomId = preUserChatroom.chatroomId,
-                chatroomJoinStatus = ChatroomJoinStatus.LEAVE
+                chatroomJoinStatus = ChatroomJoinStatus.LEAVE,
             )
 
         userChatroomHistoryWriter.create(
             userId = userId,
             chatroomId = chatroomId,
-            chatroomJoinStatus = ChatroomJoinStatus.LEAVE
+            chatroomJoinStatus = ChatroomJoinStatus.LEAVE,
         )
 
         return userChatroom
     }
+
     fun joinUserChatroom(
         preUserChatroom: UserChatroom?,
         userId: Long,
@@ -374,7 +421,7 @@ class ChatService(
                 userChatroomWriter.create(
                     userId = userId,
                     chatroomId = chatroomId,
-                    chatroomJoinStatus = ChatroomJoinStatus.JOIN
+                    chatroomJoinStatus = ChatroomJoinStatus.JOIN,
                 )
             } else {
                 // 입장 후 떠난 상태인 경우
@@ -382,7 +429,7 @@ class ChatService(
                     userChatroomId = preUserChatroom.userChatroomId,
                     userId = preUserChatroom.userId,
                     chatroomId = preUserChatroom.chatroomId,
-                    chatroomJoinStatus = ChatroomJoinStatus.JOIN
+                    chatroomJoinStatus = ChatroomJoinStatus.JOIN,
                 )
             }
 
@@ -390,7 +437,7 @@ class ChatService(
         userChatroomHistoryWriter.create(
             userId = userId,
             chatroomId = chatroomId,
-            chatroomJoinStatus = ChatroomJoinStatus.JOIN
+            chatroomJoinStatus = ChatroomJoinStatus.JOIN,
         )
 
         return userChatroom
@@ -401,31 +448,34 @@ class ChatService(
         userId: Long,
         chatroomId: Long,
         page: Int,
-        size: Int
+        size: Int,
     ): ReadChatListOuterResponse {
-        val pageable = PageRequest.of(
-            page,
-            size,
-            Sort.by(Sort.Direction.DESC, "createdAt")
-        )
-
-        val chatPage = chatReader.findByUserIdAndChatroomId(
-            userId = userId,
-            chatroomId = chatroomId,
-            pageable = pageable
-        )
-
-        val userMap = accountClient.findByIdIn(chatPage.content.map {it.userId}).associateBy {it.userId }
-
-        val contents = chatPage.content.map { chat ->
-            val user = userMap[chat.userId]
-            ReadChatOuterResponse(
-                chatId = chat.chatId,
-                userName = user?.name ?: "-",
-                content = chat.content,
-                createdAt = chat.createdAt!!
+        val pageable =
+            PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt"),
             )
-        }
+
+        val chatPage =
+            chatReader.findByUserIdAndChatroomId(
+                userId = userId,
+                chatroomId = chatroomId,
+                pageable = pageable,
+            )
+
+        val userMap = accountClient.findByIdIn(chatPage.content.map { it.userId }).associateBy { it.userId }
+
+        val contents =
+            chatPage.content.map { chat ->
+                val user = userMap[chat.userId]
+                ReadChatOuterResponse(
+                    chatId = chat.chatId,
+                    userName = user?.name ?: "-",
+                    content = chat.content,
+                    createdAt = chat.createdAt!!,
+                )
+            }
 
         return ReadChatListOuterResponse(
             contents = contents,
@@ -433,7 +483,7 @@ class ChatService(
             size = chatPage.size,
             totalElements = chatPage.totalElements,
             totalPages = chatPage.totalPages,
-            hasNext = chatPage.hasNext()
+            hasNext = chatPage.hasNext(),
         )
     }
 
@@ -442,32 +492,35 @@ class ChatService(
         chatroomId: Long,
         readChatContainingContentOuterRequest: ReadChatContainingContentOuterRequest,
         page: Int,
-        size: Int
+        size: Int,
     ): ReadChatListOuterResponse {
-        val pageable = PageRequest.of(
-            page,
-            size,
-            Sort.by(Sort.Direction.DESC, "createdAt")
-        )
-
-        val chatPage = chatReader.findByUserIdAndChatroomIdAnd(
-            userId = userId,
-            chatroomId = chatroomId,
-            content = readChatContainingContentOuterRequest.content,
-            pageable = pageable
-        )
-
-        val userMap = accountClient.findByIdIn(chatPage.content.map {it.userId}).associateBy {it.userId }
-
-        val contents = chatPage.content.map { chat ->
-            val user = userMap[chat.userId]
-            ReadChatOuterResponse(
-                chatId = chat.chatId,
-                userName = user?.name ?: "-",
-                content = chat.content,
-                createdAt = chat.createdAt!!
+        val pageable =
+            PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt"),
             )
-        }
+
+        val chatPage =
+            chatReader.findByUserIdAndChatroomIdAnd(
+                userId = userId,
+                chatroomId = chatroomId,
+                content = readChatContainingContentOuterRequest.content,
+                pageable = pageable,
+            )
+
+        val userMap = accountClient.findByIdIn(chatPage.content.map { it.userId }).associateBy { it.userId }
+
+        val contents =
+            chatPage.content.map { chat ->
+                val user = userMap[chat.userId]
+                ReadChatOuterResponse(
+                    chatId = chat.chatId,
+                    userName = user?.name ?: "-",
+                    content = chat.content,
+                    createdAt = chat.createdAt!!,
+                )
+            }
 
         return ReadChatListOuterResponse(
             contents = contents,
@@ -475,13 +528,13 @@ class ChatService(
             size = chatPage.size,
             totalElements = chatPage.totalElements,
             totalPages = chatPage.totalPages,
-            hasNext = chatPage.hasNext()
+            hasNext = chatPage.hasNext(),
         )
     }
 
     fun readChatroomListByUserIdAndTitleContaining(
         userId: Long,
-        title: String
+        title: String,
     ): ReadChatroomListOuterResponse {
         val chatroomList = chatroomReader.findByUserIdAndTitleContaining(userId, title)
 
@@ -492,7 +545,7 @@ class ChatService(
                     title = it.title,
                     description = it.description,
                 )
-            }
+            },
         )
     }
 
@@ -501,35 +554,48 @@ class ChatService(
 
         return ReadChatCountInnerResponse(response)
     }
+
     fun countChatroomByUserId(userId: Long): ReadChatroomCountInnerResponse {
         val response = chatroomReader.countByUserId(userId)
 
         return ReadChatroomCountInnerResponse(response)
     }
-    fun countChatByUserIdAndRiskLevel(userId: Long, riskLevel: RiskLevel): ReadChatCountInnerResponse {
+
+    fun countChatByUserIdAndRiskLevel(
+        userId: Long,
+        riskLevel: RiskLevel,
+    ): ReadChatCountInnerResponse {
         val response = chatReader.countByUserIdAndRiskLevel(userId, riskLevel)
 
         return ReadChatCountInnerResponse(response)
     }
-    fun findChatByUserIdAndRiskLevel(page: Int, size: Int, userId: Long, riskLevel: RiskLevel): ReadChatPageInnerResponse {
-        val pageable = PageRequest.of(
-            page,
-            size,
-            Sort.by(Sort.Direction.DESC, "createdAt")
-        )
+
+    fun findChatByUserIdAndRiskLevel(
+        page: Int,
+        size: Int,
+        userId: Long,
+        riskLevel: RiskLevel,
+    ): ReadChatPageInnerResponse {
+        val pageable =
+            PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt"),
+            )
 
         val chatPage = chatReader.findByUserIdAndRiskLevel(userId, riskLevel, pageable)
         val chatContent = chatPage.content
 
-        val response = chatContent.map { chat ->
-            ReadChatInnerResponse(
-                chatId = chat.chatId,
-                content = chat.content,
-                chatroomId = chat.chatroomId,
-                userId = chat.userId,
-                riskLevel = chat.riskLevel,
-            )
-        }
+        val response =
+            chatContent.map { chat ->
+                ReadChatInnerResponse(
+                    chatId = chat.chatId,
+                    content = chat.content,
+                    chatroomId = chat.chatroomId,
+                    userId = chat.userId,
+                    riskLevel = chat.riskLevel,
+                )
+            }
 
         return ReadChatPageInnerResponse(
             contents = response,
@@ -537,7 +603,7 @@ class ChatService(
             size = chatPage.size,
             totalElements = chatPage.totalElements,
             totalPages = chatPage.totalPages,
-            hasNext = chatPage.hasNext()
+            hasNext = chatPage.hasNext(),
         )
     }
 }

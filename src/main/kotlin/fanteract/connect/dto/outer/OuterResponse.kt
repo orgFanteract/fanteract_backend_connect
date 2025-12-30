@@ -8,7 +8,7 @@ data class CreateChatroomOuterResponse(
 )
 
 data class ReadChatroomListOuterResponse(
-    val response: List<ReadChatroomOuterResponse>
+    val response: List<ReadChatroomOuterResponse>,
 )
 
 data class ReadChatroomOuterResponse(

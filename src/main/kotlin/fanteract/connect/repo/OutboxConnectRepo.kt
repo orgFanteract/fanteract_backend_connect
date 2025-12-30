@@ -9,23 +9,19 @@ import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
 @Repository
-interface OutboxConnectRepo: JpaRepository<OutboxConnect, Long> {
-    fun findTop500ByOutboxStatusOrderByCreatedAtAsc(
-        status: OutboxStatus
-    ): List<OutboxConnect>
+interface OutboxConnectRepo : JpaRepository<OutboxConnect, Long> {
+    fun findTop500ByOutboxStatusOrderByCreatedAtAsc(status: OutboxStatus): List<OutboxConnect>
 
-    fun findAllByOutboxStatusOrderByCreatedAtDesc(
-        outboxStatus: OutboxStatus
-    ): List<OutboxConnect>
+    fun findAllByOutboxStatusOrderByCreatedAtDesc(outboxStatus: OutboxStatus): List<OutboxConnect>
 
     @Modifying
     @Query(
         "update OutboxConnect o " +
-                "set o.outboxStatus = :status " +
-                "where o.outboxId in :ids"
+            "set o.outboxStatus = :status " +
+            "where o.outboxId in :ids",
     )
     fun bulkUpdateStatus(
         @Param("status") status: OutboxStatus,
-        @Param("ids") ids: List<Long>
+        @Param("ids") ids: List<Long>,
     ): Int
 }

@@ -17,25 +17,24 @@ import kotlin.String
 class ChatWriter(
     private val chatRepo: ChatRepo,
     private val kafkaTemplate: KafkaTemplate<String, String>,
-    private val chatCountAccumulator: ChatCountAccumulator
+    private val chatCountAccumulator: ChatCountAccumulator,
 ) {
     fun create(
         content: String,
         chatroomId: Long,
         userId: Long,
         riskLevel: RiskLevel,
-    ): Chat {
-        return chatRepo.save(
+    ): Chat =
+        chatRepo.save(
             Chat(
                 content = content,
                 chatroomId = chatroomId,
                 userId = userId,
                 riskLevel = riskLevel,
-            )
+            ),
         )
-    }
 
-    fun <T : Any>sendMessageUsingMessage(
+    fun <T : Any> sendMessageUsingMessage(
         content: T,
         topicService: TopicService,
         methodName: String,
@@ -44,11 +43,10 @@ class ChatWriter(
 
         val base64Content = Base64.getEncoder().encodeToString(jsonContent.toByteArray())
 
-        kafkaTemplate.send(
-            "$topicService.$methodName",
-            base64Content
-        ).get()
+        kafkaTemplate
+            .send(
+                "$topicService.$methodName",
+                base64Content,
+            ).get()
     }
-
-
 }

@@ -13,28 +13,31 @@ class ChatroomWriter(
     fun create(
         title: String,
         description: String?,
-        userId: Long
-    ): Chatroom {
-        return chatroomRepo.save(
+        userId: Long,
+    ): Chatroom =
+        chatroomRepo.save(
             Chatroom(
                 title = title,
                 description = description,
                 userId = userId,
-            )
+            ),
         )
 
-    }
-
     fun increaseChatCount(chatroomId: Long) {
-        val chatroom = chatroomRepo.findById(chatroomId).
-           orElseThrow { ExceptionType.withType(MessageType.NOT_EXIST) }
+        val chatroom =
+            chatroomRepo
+                .findById(chatroomId)
+                .orElseThrow { ExceptionType.withType(MessageType.NOT_EXIST) }
 
         chatroom.chatCount += 1
 
         chatroomRepo.save(chatroom)
     }
 
-    fun incrementChatCount(chatroomId: Long, delta: Long) {
+    fun incrementChatCount(
+        chatroomId: Long,
+        delta: Long,
+    ) {
         chatroomRepo.incrementChatCount(chatroomId, delta)
     }
 }

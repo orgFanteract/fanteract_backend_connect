@@ -11,39 +11,39 @@ import org.springframework.stereotype.Component
 class ChatroomReader(
     private val chatroomRepo: ChatroomRepo,
 ) {
-    fun findByUserId(userId: Long): List<Chatroom> {
-        return chatroomRepo.findByUserId(userId)
-    }
+    fun findByUserId(userId: Long): List<Chatroom> = chatroomRepo.findByUserId(userId)
+
     fun findByChatroomIdAndUserId(
         chatroomId: Long,
-        userId: Long
+        userId: Long,
     ): Chatroom {
         val chatroom =
-            chatroomRepo.findById(chatroomId)
-                .orElseThrow{ExceptionType.withType(MessageType.NOT_EXIST)}
+            chatroomRepo
+                .findById(chatroomId)
+                .orElseThrow { ExceptionType.withType(MessageType.NOT_EXIST) }
 
-        if (chatroom.userId != userId){
+        if (chatroom.userId != userId) {
             throw ExceptionType.withType(MessageType.NOT_EXIST)
         }
 
         return chatroom
     }
 
-    fun existsById(chatroomId: Long){
-        val chatroom = chatroomRepo.findById(chatroomId).
-            orElseThrow { ExceptionType.withType(MessageType.NOT_EXIST) }
+    fun existsById(chatroomId: Long) {
+        val chatroom =
+            chatroomRepo
+                .findById(chatroomId)
+                .orElseThrow { ExceptionType.withType(MessageType.NOT_EXIST) }
 
-        if (chatroom.status == Status.DELETED){
+        if (chatroom.status == Status.DELETED) {
             throw ExceptionType.withType(MessageType.NOT_EXIST)
         }
     }
 
-    fun findByUserIdAndTitleContaining(userId: Long, title: String): List<Chatroom> {
-        return chatroomRepo.findByUserIdAndTitleContaining(userId, title)
-    }
+    fun findByUserIdAndTitleContaining(
+        userId: Long,
+        title: String,
+    ): List<Chatroom> = chatroomRepo.findByUserIdAndTitleContaining(userId, title)
 
-    fun countByUserId(userId: Long): Long {
-        return chatroomRepo.countByUserId(userId)
-    }
-
+    fun countByUserId(userId: Long): Long = chatroomRepo.countByUserId(userId)
 }

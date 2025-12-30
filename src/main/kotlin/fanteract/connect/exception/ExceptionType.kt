@@ -3,7 +3,7 @@ package fanteract.connect.exception
 class ExceptionType(
     val type: MessageType,
     override val message: String = type.getMessage(),
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
 ) : RuntimeException(message, cause) {
     companion object {
         fun withType(type: MessageType): ExceptionType = ExceptionType(type)

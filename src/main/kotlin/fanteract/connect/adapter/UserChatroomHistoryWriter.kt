@@ -21,7 +21,7 @@ class UserChatroomHistoryWriter(
                     userId = userId,
                     chatroomId = chatroomId,
                     chatroomJoinStatus = chatroomJoinStatus,
-                )
+                ),
             )
 
         return userChatroomHistory

@@ -10,16 +10,17 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-
+import java.util.UUID
 
 @Entity
-@Table(name = "outbox_connect")
+@Table(name = "outbox_connects")
 data class OutboxConnect(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val outboxId: Long = 0L,
+    val eventId: String = UUID.randomUUID().toString(),
     val content: String, // 전송 내용. JSON을 base64로 인코딩 후 적재
-    val topic: String, // 구독 대상 (대상 서비스 + 메서드 이름)
+    val topic: String, // 구독 대상
     @Enumerated(EnumType.STRING)
     var outboxStatus: OutboxStatus,
-): BaseEntity()
+) : BaseEntity()

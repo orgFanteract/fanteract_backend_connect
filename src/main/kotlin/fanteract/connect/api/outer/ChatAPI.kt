@@ -1,11 +1,8 @@
 package fanteract.connect.api.outer
 
-import fanteract.connect.annotation.LoginRequired
-import io.swagger.v3.oas.annotations.Operation
-import jakarta.servlet.http.HttpServletRequest
-import fanteract.connect.config.JwtParser
 import fanteract.connect.dto.outer.*
 import fanteract.connect.service.ChatService
+import io.swagger.v3.oas.annotations.Operation
 import org.springframework.http.ResponseEntity
 import org.springframework.messaging.handler.annotation.DestinationVariable
 import org.springframework.messaging.handler.annotation.MessageMapping
@@ -31,8 +28,7 @@ class ChatAPI(
     fun createChatroom(
         @RequestHeader("X-User-Id") userId: Long,
         @RequestBody createChatroomOuterRequest: CreateChatroomOuterRequest,
-        ): ResponseEntity<CreateChatroomOuterResponse> {
-        
+    ): ResponseEntity<CreateChatroomOuterResponse> {
         val response = chatService.createChatroom(userId, createChatroomOuterRequest)
 
         return ResponseEntity.ok().body(response)
@@ -56,7 +52,6 @@ class ChatAPI(
         @RequestParam("title") title: String,
         @RequestHeader("X-User-Id") userId: Long,
     ): ResponseEntity<ReadChatroomListOuterResponse> {
-        
         val response = chatService.readChatroomListByUserIdAndTitleContaining(userId, title)
 
         return ResponseEntity.ok().body(response)
@@ -76,7 +71,7 @@ class ChatAPI(
                 userId = userId,
                 chatroomId = chatroomId,
                 page = page,
-                size = size
+                size = size,
             )
 
         return ResponseEntity.ok().body(response)
@@ -89,7 +84,7 @@ class ChatAPI(
         @RequestHeader("X-User-Id") userId: Long,
         @PathVariable chatroomId: Long,
         @RequestParam("page", defaultValue = "0") page: Int,
-        @RequestBody readChatContainingContentOuterRequest: ReadChatContainingContentOuterRequest
+        @RequestBody readChatContainingContentOuterRequest: ReadChatContainingContentOuterRequest,
     ): ResponseEntity<ReadChatListOuterResponse> {
         val response =
             chatService.readChatContainingByChatroomId(
@@ -97,7 +92,7 @@ class ChatAPI(
                 chatroomId = chatroomId,
                 readChatContainingContentOuterRequest = readChatContainingContentOuterRequest,
                 page = page,
-                size = 1 // 한 개씩 찾기 위해 1로 고정
+                size = 1, // 한 개씩 찾기 위해 1로 고정
             )
 
         return ResponseEntity.ok().body(response)
@@ -110,7 +105,6 @@ class ChatAPI(
         @RequestHeader("X-User-Id") userId: Long,
         @PathVariable chatroomId: Long,
     ): ResponseEntity<ReadChatroomOuterResponse> {
-        
         val response = chatService.readChatroomSummaryById(userId, chatroomId)
 
         return ResponseEntity.ok().body(response)
@@ -146,7 +140,7 @@ class ChatAPI(
     fun sendChat(
         principal: Principal,
         sendChatRequest: SendChatRequest,
-        @DestinationVariable chatroomId: Long
+        @DestinationVariable chatroomId: Long,
     ): SendChatResponse {
         println("send Chat")
         val userId = principal.name.toLong()

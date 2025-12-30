@@ -2,7 +2,6 @@ package fanteract.connect.dto
 
 import fanteract.connect.enumerate.RiskLevel
 
-
 data class FilterResult(
     val action: RiskLevel,
     val reason: String? = null,

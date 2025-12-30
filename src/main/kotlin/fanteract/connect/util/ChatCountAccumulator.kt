@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 class ChatCountAccumulator {
     private val pendingCountMap: MutableMap<Long, Long> = ConcurrentHashMap()
 
-    fun increase(chatroomId: Long){
+    fun increase(chatroomId: Long) {
         pendingCountMap.merge(chatroomId, 1L) { old, one -> old + one }
     }
 
