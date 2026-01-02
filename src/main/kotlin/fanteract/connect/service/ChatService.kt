@@ -179,7 +179,7 @@ class ChatService(
         return LeaveChatroomOuterResponse(userChatroom.userChatroomId)
     }
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 10000)
     fun updateChatCount() {
         val chatCounterMap = chatCountAccumulator.drain()
 

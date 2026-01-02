@@ -135,6 +135,7 @@ class ChatAPI(
     }
 
     // 특정 채팅방에 채팅 전송
+    // 브로커 역할
     @MessageMapping("/chat.{chatroomId}") // 다음 url path를 통해 발동
     @SendTo("/subscribe/chat.{chatroomId}") // 해당 결과는 다음 path를 구독하는 클라이언트에게 전달
     fun sendChat(

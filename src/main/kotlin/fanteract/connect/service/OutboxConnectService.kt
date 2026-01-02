@@ -26,7 +26,7 @@ class OutboxConnectService(
     private val chatWriter: ChatWriter,
     private val chatroomWriter: ChatroomWriter,
 ) {
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 10000)
     fun sendToMessageBroker() {
         // 토픽 : 서비스 이름, 벨류 : 대상 서비스 메서드 이름 + 매개변수
         // 아직 처리되지 않은 메세지 조회
@@ -57,7 +57,7 @@ class OutboxConnectService(
         outboxConnectRepo.save(message)
     }
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 10000)
     @Transactional
     fun sendToMessageBrokerNew() {
         val messages =

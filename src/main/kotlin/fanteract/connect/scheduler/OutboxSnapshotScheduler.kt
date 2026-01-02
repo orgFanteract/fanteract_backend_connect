@@ -15,7 +15,7 @@ class OutboxSnapshotScheduler(
     private val outboxConnectRepo: OutboxConnectRepo,
     private val objectMapper: ObjectMapper,
 ) {
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 10000)
     fun flushToOutbox() {
         val snapshot = deltaStorage.snapshot()
 
