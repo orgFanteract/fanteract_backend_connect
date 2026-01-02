@@ -17,7 +17,7 @@ class OutboxPublishScheduler(
     private val workerId = "outbox-worker-${Random.nextInt(100000)}"
     private val topic = "account.mypage.delta" // 원하는 토픽명
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 10000)
     @Transactional
     fun publishOutbox() {
         val targets = outboxConnectRepo.findTop500ByOutboxStatusOrderByCreatedAtAsc(OutboxStatus.NEW)
