@@ -11,26 +11,25 @@ import fanteract.connect.exception.MessageType
 import fanteract.connect.util.CircuitBreakerManager
 import fanteract.connect.util.CircuitBreakerUtil
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import kotlin.collections.toTypedArray
 import kotlin.jvm.java
-import kotlin.text.get
 
 @Component
 class AccountClient(
-    @Value($$"${client.account-service.url}") userServiceUrl: String,
-    private val restClient: RestClient =
-        RestClient
-            .builder()
-            .baseUrl(userServiceUrl)
-            .build(),
+    @Value($$"${client.account-service.url}")
+    accountServiceUrl: String,
+    restClientBuilder: RestClient.Builder,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val circuitBreakerManager: CircuitBreakerManager,
     private val circuitBreakerUtil: CircuitBreakerUtil,
 ) {
+    private val restClient: RestClient = restClientBuilder
+        .baseUrl(accountServiceUrl)
+        .build()
+
     fun existsById(userId: Long): Boolean {
         val response =
             circuitBreakerUtil
