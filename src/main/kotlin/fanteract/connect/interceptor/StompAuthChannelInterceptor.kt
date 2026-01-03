@@ -80,8 +80,6 @@ class StompAuthChannelInterceptor(
             }
         }
 
-        println("DEBUG command=$command, headers=${accessor.messageHeaders}")
-
         return MessageBuilder.createMessage(message.payload, accessor.messageHeaders)
     }
 }

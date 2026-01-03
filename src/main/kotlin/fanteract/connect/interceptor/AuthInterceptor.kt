@@ -44,8 +44,6 @@ class AuthInterceptor(
                     .payload.subject
 
             request.setAttribute("userId", subject)
-
-            println("subject : $subject")
             true
         } catch (e: Exception) {
             unauthorized(response)

@@ -143,7 +143,6 @@ class ChatAPI(
         sendChatRequest: SendChatRequest,
         @DestinationVariable chatroomId: Long,
     ): SendChatResponse {
-        println("send Chat")
         val userId = principal.name.toLong()
         val response = chatService.sendChatNew(sendChatRequest, chatroomId, userId)
 //        val response = chatService.sendChat(sendChatRequest, chatroomId, userId)

@@ -19,12 +19,9 @@ class EventConsumer(
         groupId = "connect-service",
     )
     fun consumeCreateChat(message: String) {
-        println("consumed")
-        println(message)
         val decodedJson = String(Base64.getDecoder().decode(message))
 
         val response = BaseUtil.fromJson<MessageWrapper<CreateChatResponse>>(decodedJson)
-        println(response)
 
         chatRepo.save(
             Chat(
@@ -34,7 +31,5 @@ class EventConsumer(
                 riskLevel = response.content.riskLevel,
             ),
         )
-
-        println("${response.content.content} - ${response.content.userId}")
     }
 }
